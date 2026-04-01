@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Game of Life</title>
+<style>
+  *,*::before,*::after { margin:0; padding:0; box-sizing:border-box; }
+
+  :root {
+    --bg: #008080;
+    --gray: #c0c0c0;
+    --dark: #808080;
+    --darker: #404040;
+    --light: #dfdfdf;
+    --white: #ffffff;
+    --black: #000000;
+    --blue: #000080;
+    --blue-light: #1084d0;
+  }
+
+  html { font-size: 11px; }
+
+  body {
+    background: var(--bg);
+    font-family: 'MS Sans Serif', 'Microsoft Sans Serif', 'Tahoma', 'Arial', sans-serif;
+    font-size: 11px;
+    color: var(--black);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px;
+  }
+
+  /* ── Win95 bevels ── */
+  .raised {
+    box-shadow:
+      inset 1px 1px 0 var(--white),
+      inset -1px -1px 0 var(--black),
+      inset 2px 2px 0 var(--light),
+      inset -2px -2px 0 var(--dark);
+  }
+
+  .sunken {
+    box-shadow:
+      inset 1px 1px 0 var(--dark),
+      inset -1px -1px 0 var(--white),
+      inset 2px 2px 0 var(--darker),
+      inset -2px -2px 0 var(--light);
+  }
+
+  .sunken-thin {
+    box-shadow:
+      inset 1px 1px 0 var(--dark),
+      inset -1px -1px 0 var(--white);
+  }
+
+  /* ── Window ── */
+  .window {
+    background: var(--gray);
+    width: 100%;
+    max-width: 840px;
+    padding: 3px;
+  }
+
+  /* ── Title bar ── */
+  .titlebar {
+    background: linear-gradient(90deg, var(--blue), var(--blue-light));
+    padding: 2px 3px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    height: 22px;
+    margin-bottom: 2px;
+  }
+
+  .titlebar-icon {
+    width: 16px; height: 16px;
+    flex-shrink: 0;
+  }
+
+  .titlebar-text {
+    flex: 1;
+    color: var(--white);
+    font-weight: bold;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+
+  .titlebar-btns { display: flex; gap: 2px; }
+
+  .tb {
+    width: 16px; height: 14px;
+    background: var(--gray);
+    border: none;
+    font-size: 9px;
+    font-family: inherit;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+    box-shadow:
+      inset 1px 1px 0 var(--white),
+      inset -1px -1px 0 var(--darker);
+  }
+  .tb:active {
+    box-shadow: inset 1px 1px 0 var(--darker), inset -1px -1px 0 var(--white);
+    padding: 1px 0 0 1px;
+  }
+
+  /* ── Menu bar ── */
+  .menubar {
+    display: flex;
+    padding: 0;
+    margin-bottom: 2px;
+    border-bottom: 1px solid var(--dark);
+  }
+
+  .menu-item {
+    padding: 3px 8px;
+    cursor: default;
+    position: relative;
+  }
+  .menu-item:hover { background: var(--blue); color: var(--white); }
+  .menu-item u { text-decoration: underline; }
+
+  .dropdown {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: -1px;
+    background: var(--gray);
+    min-width: 170px;
+    padding: 2px;
+    z-index: 999;
+    box-shadow:
+      inset 1px 1px 0 var(--white),
+      inset -1px -1px 0 var(--black),
+      2px 2px 0 rgba(0,0,0,0.25);
+  }
+  .dropdown.open { display: block; }
+
+  .dropdown button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 3px 24px 3px 20px;
+    background: none;
+    border: none;
+    font: inherit;
+    color: inherit;
+    cursor: default;
+  }
+  .dropdown button:hover { background: var(--blue); color: var(--white); }
+
+  .drop-sep {
+    height: 0;
+    margin: 3px 2px;
+    border-top: 1px solid var(--dark);
+    border-bottom: 1px solid var(--white);
+  }
+
+  /* ── Toolbar ── */
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0px;
+    padding: 2px 3px;
+    border-top: 1px solid var(--white);
+    border-bottom: 1px solid var(--dark);
+    margin-bottom: 3px;
+    flex-wrap: wrap;
+  }
+
+  .tsep {
+    width: 2px; height: 22px; margin: 0 4px;
+    border-left: 1px solid var(--dark);
+    border-right: 1px solid var(--white);
+  }
+
+  .tbtn {
+    height: 23px;
+    min-width: 23px;
+    padding: 0 7px;
+    background: var(--gray);
+    border: none;
+    font: inherit;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    box-shadow:
+      inset 1px 1px 0 var(--white),
+      inset -1px -1px 0 var(--darker);
+  }
+  .tbtn:hover { box-shadow: inset 1px 1px 0 var(--white), inset -1px -1px 0 var(--black); }
+  .tbtn:active, .tbtn.on {
+    box-shadow: inset 1px 1px 0 var(--darker), inset -1px -1px 0 var(--white);
+    padding: 1px 6px 0 8px;
+  }
+
+  .toolbar label { margin-left: 8px; margin-right: 3px; }
+
+  .toolbar select {
+    height: 21px;
+    font: inherit;
+    background: var(--white);
+    padding: 0 2px;
+    border: none;
+    cursor: pointer;
+    box-shadow: inset 1px 1px 0 var(--darker), inset -1px -1px 0 var(--white);
+  }
+
+  .speed-wrap {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    margin-left: auto;
+  }
+
+  input[type="range"] { width: 76px; height: 20px; cursor: pointer; }
+
+  /* ── Canvas ── */
+  .canvas-area { padding: 0 3px; margin-bottom: 3px; }
+
+  .canvas-frame {
+    width: 100%;
+    aspect-ratio: 16 / 10;
+    background: var(--white);
+    cursor: crosshair;
+    overflow: hidden;
+    box-shadow:
+      inset 1px 1px 0 var(--darker),
+      inset -1px -1px 0 var(--white),
+      inset 2px 2px 0 var(--dark),
+      inset -2px -2px 0 var(--light);
+  }
+
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+  }
+
+  /* ── Status bar ── */
+  .statusbar { display: flex; gap: 1px; padding: 2px 3px 3px; }
+
+  .scell {
+    padding: 2px 6px;
+    background: var(--gray);
+    flex: 1;
+    box-shadow: inset 1px 1px 0 var(--dark), inset -1px -1px 0 var(--white);
+    white-space: nowrap;
+    overflow: hidden;
+  }
+  .scell:first-child { flex: 4; }
+
+  /* ── About dialog ── */
+  .overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: transparent;
+    align-items: center;
+    justify-content: center;
+  }
+  .overlay.open { display: flex; }
+
+  .dialog {
+    background: var(--gray);
+    max-width: 320px;
+    width: 90%;
+    padding: 3px;
+    box-shadow:
+      inset 1px 1px 0 var(--white),
+      inset -1px -1px 0 var(--black),
+      inset 2px 2px 0 var(--light),
+      inset -2px -2px 0 var(--dark),
+      4px 4px 0 rgba(0,0,0,0.3);
+  }
+
+  .dialog .body {
+    padding: 16px 20px;
+    text-align: center;
+    line-height: 1.7;
+  }
+
+  .dialog .body h3 { font-size: 12px; margin-bottom: 8px; }
+  .dialog .body p { color: #404040; }
+
+  .ok-btn {
+    margin: 12px auto 0;
+    display: block;
+    padding: 3px 32px;
+    height: 26px;
+    background: var(--gray);
+    border: none;
+    font: inherit;
+    cursor: pointer;
+    box-shadow:
+      inset 1px 1px 0 var(--white),
+      inset -1px -1px 0 var(--darker);
+  }
+  .ok-btn:active {
+    box-shadow: inset 1px 1px 0 var(--darker), inset -1px -1px 0 var(--white);
+  }
+
+  @media (max-width: 640px) {
+    body { align-items: flex-start; padding: 0; }
+    .canvas-frame { aspect-ratio: 4 / 3; }
+    .speed-wrap { margin-left: 4px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="window raised">
+  <!-- Title bar -->
+  <div class="titlebar">
+    <svg class="titlebar-icon" viewBox="0 0 16 16">
+      <rect x="2" y="2" width="4" height="4" fill="#fff"/>
+      <rect x="8" y="2" width="4" height="4" fill="#fff"/>
+      <rect x="5" y="5" width="4" height="4" fill="#fff"/>
+      <rect x="2" y="8" width="4" height="4" fill="#fff"/>
+      <rect x="8" y="8" width="4" height="4" fill="#fff"/>
+      <rect x="5" y="11" width="4" height="4" fill="#fff"/>
+    </svg>
+    <div class="titlebar-text">Game of Life</div>
+    <div class="titlebar-btns">
+      <button class="tb">_</button>
+      <button class="tb">□</button>
+      <button class="tb" style="font-weight:bold;font-size:10px">×</button>
+    </div>
+  </div>
+
+  <!-- Menu bar -->
+  <div class="menubar">
+    <div class="menu-item" data-menu="game"><u>G</u>ame
+      <div class="dropdown" id="ddGame">
+        <button id="mNew">New Random</button>
+        <button id="mClear">Clear Grid</button>
+        <div class="drop-sep"></div>
+        <button id="mStep">Single Step</button>
+      </div>
+    </div>
+    <div class="menu-item" data-menu="pat"><u>P</u>atterns
+      <div class="dropdown" id="ddPat"></div>
+    </div>
+    <div class="menu-item" data-menu="help"><u>H</u>elp
+      <div class="dropdown" id="ddHelp">
+        <button id="mAbout">About Game of Life</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toolbar -->
+  <div class="toolbar">
+    <button class="tbtn" id="btnPlay" title="Play / Pause (Space)">▶</button>
+    <button class="tbtn" id="btnStep" title="Step (→)">⏭</button>
+    <div class="tsep"></div>
+    <button class="tbtn" id="btnRandom">Random</button>
+    <button class="tbtn" id="btnClear">Clear</button>
+    <div class="tsep"></div>
+    <label for="sel">Pattern:</label>
+    <select id="sel"></select>
+    <div class="speed-wrap">
+      <label>Speed:</label>
+      <input type="range" id="speed" min="1" max="60" value="12">
+    </div>
+  </div>
+
+  <!-- Canvas -->
+  <div class="canvas-area">
+    <div class="canvas-frame" id="frame">
+      <canvas id="c"></canvas>
+    </div>
+  </div>
+
+  <!-- Status bar -->
+  <div class="statusbar">
+    <div class="scell" id="msg">Click and drag to draw cells. Press ▶ to start.</div>
+    <div class="scell">Gen: <b id="gen">0</b></div>
+    <div class="scell">Pop: <b id="pop">0</b></div>
+  </div>
+</div>
+
+<!-- About -->
+<div class="overlay" id="aboutDlg">
+  <div class="dialog raised">
+    <div class="titlebar">
+      <div class="titlebar-text">About Game of Life</div>
+      <div class="titlebar-btns"><button class="tb" id="aboutX" style="font-weight:bold;font-size:10px">×</button></div>
+    </div>
+    <div class="body">
+      <h3>Conway's Game of Life</h3>
+      <p>
+        A cellular automaton devised by<br>
+        John Horton Conway in 1970.<br><br>
+        <b>Rules:</b><br>
+        Live cell with 2–3 neighbours survives.<br>
+        Dead cell with exactly 3 becomes alive.<br>
+        All other cells die or stay dead.<br><br>
+        <span style="color:#808080">Windows 95 Edition</span>
+      </p>
+      <button class="ok-btn" id="aboutOK">OK</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const CELL = 6;
+  let cols, rows, grid, next;
+  let running = false, gen = 0, pop = 0, fps = 12, animId, lastT = 0;
+
+  const cv = document.getElementById('c');
+  const cx = cv.getContext('2d');
+  const fr = document.getElementById('frame');
+  const eG = document.getElementById('gen');
+  const eP = document.getElementById('pop');
+  const eM = document.getElementById('msg');
+
+  /* ── Patterns ── */
+  const P = {
+    '(none)': null,
+    'Glider': [[0,1],[1,2],[2,0],[2,1],[2,2]],
+    'LWSS': [[0,1],[0,3],[1,4],[2,0],[2,4],[3,1],[3,2],[3,3],[3,4]],
+    'Pulsar': (()=>{const q=[[2,1],[3,1],[4,1],[1,2],[1,3],[1,4],[2,6],[3,6],[4,6],[6,2],[6,3],[6,4]],f=[];q.forEach(([r,c])=>{f.push([r,c],[r,12-c],[12-r,c],[12-r,12-c])});return[...new Set(f.map(p=>p.join(',')))].map(s=>s.split(',').map(Number))})(),
+    'Gosper Glider Gun': [[5,1],[5,2],[6,1],[6,2],[3,13],[3,14],[4,12],[4,16],[5,11],[5,17],[6,11],[6,15],[6,17],[6,18],[7,11],[7,17],[8,12],[8,16],[9,13],[9,14],[1,25],[2,23],[2,25],[3,21],[3,22],[4,21],[4,22],[5,21],[5,22],[6,23],[6,25],[7,25],[3,35],[3,36],[4,35],[4,36]],
+    'R-pentomino': [[0,1],[0,2],[1,0],[1,1],[2,1]],
+    'Diehard': [[0,6],[1,0],[1,1],[2,1],[2,5],[2,6],[2,7]],
+    'Acorn': [[0,1],[1,3],[2,0],[2,1],[2,4],[2,5],[2,6]],
+    'Beacon': [[0,0],[0,1],[1,0],[2,3],[3,2],[3,3]],
+    'Toad': [[1,0],[1,1],[1,2],[0,1],[0,2],[0,3]],
+  };
+
+  const sel = document.getElementById('sel');
+  const ddPat = document.getElementById('ddPat');
+  Object.keys(P).forEach(n => {
+    const o = document.createElement('option'); o.value=n; o.textContent=n; sel.appendChild(o);
+    if (n==='(none)') return;
+    const b = document.createElement('button'); b.textContent=n;
+    b.addEventListener('click', ()=>{ place(n); closeMenus(); });
+    ddPat.appendChild(b);
+  });
+
+  /* ── Grid ── */
+  function resize() {
+    const r = fr.getBoundingClientRect();
+    cv.width = Math.floor(r.width);
+    cv.height = Math.floor(r.height);
+    cols = Math.floor(cv.width/CELL);
+    rows = Math.floor(cv.height/CELL);
+    const old = grid;
+    grid = new Uint8Array(cols*rows);
+    next = new Uint8Array(cols*rows);
+    if (old) grid.set(old.subarray(0, Math.min(old.length, grid.length)));
+    draw();
+  }
+
+  function clear() { grid.fill(0); gen=0; pop=0; ui(); draw(); eM.textContent='Grid cleared.'; }
+  function rnd() {
+    for(let i=0;i<grid.length;i++) grid[i]=Math.random()<0.25?1:0;
+    gen=0; cntPop(); ui(); draw(); eM.textContent='Random seed generated.';
+  }
+  function place(n) {
+    const p=P[n]; if(!p) return; clear();
+    const or=Math.floor(rows/2)-6, oc=Math.floor(cols/2)-6;
+    p.forEach(([r,c])=>{ const y=r+or,x=c+oc; if(y>=0&&y<rows&&x>=0&&x<cols) grid[y*cols+x]=1; });
+    cntPop(); ui(); draw(); eM.textContent=`Pattern: ${n}`; sel.value=n;
+  }
+  sel.addEventListener('change',()=>{ if(sel.value!=='(none)') place(sel.value); });
+
+  /* ── Sim ── */
+  function step() {
+    let p=0;
+    for(let y=0;y<rows;y++) for(let x=0;x<cols;x++){
+      let n=0;
+      for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){
+        if(!dy&&!dx) continue;
+        n+=grid[((y+dy+rows)%rows)*cols+(x+dx+cols)%cols];
+      }
+      const i=y*cols+x;
+      next[i]=(grid[i]&&(n===2||n===3))||(!grid[i]&&n===3)?1:0;
+      p+=next[i];
+    }
+    [grid,next]=[next,grid]; gen++; pop=p;
+  }
+  function cntPop(){ let p=0; for(let i=0;i<grid.length;i++) p+=grid[i]; pop=p; }
+
+  /* ── Draw ── */
+  function draw() {
+    cx.fillStyle='#fff';
+    cx.fillRect(0,0,cv.width,cv.height);
+    // grid lines
+    cx.strokeStyle='#c0c0c0';
+    cx.lineWidth=1;
+    for(let x=0;x<=cols;x++){ cx.beginPath(); cx.moveTo(x*CELL+.5,0); cx.lineTo(x*CELL+.5,rows*CELL); cx.stroke(); }
+    for(let y=0;y<=rows;y++){ cx.beginPath(); cx.moveTo(0,y*CELL+.5); cx.lineTo(cols*CELL,y*CELL+.5); cx.stroke(); }
+    // cells
+    cx.fillStyle='#000';
+    for(let y=0;y<rows;y++) for(let x=0;x<cols;x++){
+      if(grid[y*cols+x]) cx.fillRect(x*CELL+1, y*CELL+1, CELL-1, CELL-1);
+    }
+  }
+  function ui(){ eG.textContent=gen; eP.textContent=pop; }
+
+  /* ── Loop ── */
+  function loop(t){
+    animId=requestAnimationFrame(loop);
+    if(t-lastT<1000/fps) return;
+    lastT=t; step(); draw(); ui();
+    eM.textContent=`Running \u2014 Generation ${gen}`;
+  }
+  function play(){
+    if(running) return; running=true;
+    document.getElementById('btnPlay').textContent='⏸';
+    document.getElementById('btnPlay').classList.add('on');
+    lastT=performance.now(); animId=requestAnimationFrame(loop);
+    eM.textContent='Running...';
+  }
+  function pause(){
+    if(!running) return; running=false;
+    document.getElementById('btnPlay').textContent='▶';
+    document.getElementById('btnPlay').classList.remove('on');
+    cancelAnimationFrame(animId);
+    eM.textContent=`Paused at generation ${gen}.`;
+  }
+  function toggle(){ running?pause():play(); }
+  function doStep(){ pause(); step(); draw(); ui(); eM.textContent=`Step \u2014 Generation ${gen}`; }
+
+  /* ── Paint ── */
+  let painting=false, pv=1;
+  function cellAt(e){
+    const r=cv.getBoundingClientRect(), sx=cv.width/r.width, sy=cv.height/r.height;
+    const ex=e.touches?e.touches[0].clientX:e.clientX, ey=e.touches?e.touches[0].clientY:e.clientY;
+    return[Math.floor((ex-r.left)*sx/CELL), Math.floor((ey-r.top)*sy/CELL)];
+  }
+  function paint(x,y){ if(x<0||x>=cols||y<0||y>=rows) return; grid[y*cols+x]=pv; cntPop(); ui(); draw(); }
+
+  cv.addEventListener('mousedown',e=>{ painting=true; const[x,y]=cellAt(e); pv=grid[y*cols+x]?0:1; paint(x,y); });
+  cv.addEventListener('mousemove',e=>{ if(painting){const[x,y]=cellAt(e);paint(x,y);} });
+  window.addEventListener('mouseup',()=>painting=false);
+  cv.addEventListener('touchstart',e=>{ e.preventDefault(); painting=true; const[x,y]=cellAt(e); pv=grid[y*cols+x]?0:1; paint(x,y); },{passive:false});
+  cv.addEventListener('touchmove',e=>{ e.preventDefault(); if(painting){const[x,y]=cellAt(e);paint(x,y);} },{passive:false});
+  cv.addEventListener('touchend',()=>painting=false);
+
+  /* ── Buttons ── */
+  document.getElementById('btnPlay').addEventListener('click', toggle);
+  document.getElementById('btnStep').addEventListener('click', doStep);
+  document.getElementById('btnRandom').addEventListener('click', rnd);
+  document.getElementById('btnClear').addEventListener('click', ()=>{ pause(); clear(); });
+  document.getElementById('speed').addEventListener('input', e=>{ fps=+e.target.value; });
+
+  /* ── Menus ── */
+  function closeMenus(){ document.querySelectorAll('.dropdown').forEach(d=>d.classList.remove('open')); }
+  document.querySelectorAll('.menu-item').forEach(mi=>{
+    mi.addEventListener('click',e=>{
+      e.stopPropagation();
+      const dd=mi.querySelector('.dropdown');
+      const was=dd.classList.contains('open');
+      closeMenus();
+      if(!was) dd.classList.add('open');
+    });
+  });
+  document.addEventListener('click', closeMenus);
+
+  document.getElementById('mNew').addEventListener('click',()=>{ rnd(); closeMenus(); });
+  document.getElementById('mClear').addEventListener('click',()=>{ pause(); clear(); closeMenus(); });
+  document.getElementById('mStep').addEventListener('click',()=>{ doStep(); closeMenus(); });
+
+  /* About */
+  const dlg=document.getElementById('aboutDlg');
+  document.getElementById('mAbout').addEventListener('click',()=>{ dlg.classList.add('open'); closeMenus(); });
+  document.getElementById('aboutX').addEventListener('click',()=>dlg.classList.remove('open'));
+  document.getElementById('aboutOK').addEventListener('click',()=>dlg.classList.remove('open'));
+
+  /* ── Keyboard ── */
+  document.addEventListener('keydown',e=>{
+    if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT') return;
+    switch(e.code){
+      case'Space': e.preventDefault(); toggle(); break;
+      case'ArrowRight': doStep(); break;
+      case'KeyC': pause(); clear(); break;
+      case'KeyR': rnd(); break;
+    }
+  });
+
+  /* ── Boot ── */
+  window.addEventListener('resize', resize);
+  resize();
+  rnd();
+})();
+</script>
+</body>
+</html>
